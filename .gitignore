@@ -1,0 +1,17 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Local evidence / working files — never committed
+evidence/
+*.log
+
+# Secrets — should never be present, but guard anyway
+*.pem
+*.key
+.env
