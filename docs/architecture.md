@@ -2,7 +2,7 @@
 
 This document describes the current-state design of `zabbix-noc-lab`. It is updated after each phase is completed and validated; it reflects what has actually been built, not the full end-state plan (see the [README](../README.md#documentation) for the phase roadmap).
 
-**Current state: Phase 01 complete.** MySQL, Zabbix server, the frontend, and monitoring connectivity are not yet deployed.
+**Current state: Phase 02 complete.** MySQL is installed and configured; Zabbix server, the frontend, and monitoring connectivity are not yet deployed.
 
 ---
 
@@ -24,13 +24,17 @@ flowchart TD
 
     subgraph OUTSIDE["OUTSIDE / Management Network — 192.168.50.0/24"]
         MGMT[Management VM<br/>192.168.50.10]
-        ZBX["zabbix-server<br/>192.168.50.20<br/>Ubuntu 24.04 LTS<br/>SSH key-auth only, UFW active"]
+        subgraph ZBXHOST["zabbix-server — 192.168.50.20<br/>Ubuntu 24.04 LTS, SSH key-auth only, UFW active"]
+            MYSQL[("MySQL<br/>zabbix database<br/>zabbix@localhost user")]
+        end
     end
 
-    MGMT -->|SSH| ZBX
+    MGMT -->|SSH| ZBXHOST
 ```
 
-At this stage, `zabbix-server` exists as a hardened, updated, time-synchronised Ubuntu 24.04 LTS host with no monitoring software installed yet.
+At this stage, `zabbix-server` is a hardened, updated, time-synchronised Ubuntu 24.04 LTS host running MySQL, with a dedicated `zabbix` database and a `zabbix@localhost` user scoped to it. No monitoring software (Zabbix Server, agent2, frontend) is installed yet.
+
+**Internet egress:** `zabbix-server` routes outbound traffic directly through NAT on pfSense (`HOST_ZABBIX → Any`), rather than through the WireGuard full-tunnel used by `mgmt`. This is a deliberate role separation, confirmed during Phase 02 — see [Phase 00 — Planning](phase-00-planning.md#internet-egress-path-direct-nat-vs-wireguard) for the full rationale.
 
 ---
 
@@ -38,7 +42,6 @@ At this stage, `zabbix-server` exists as a hardened, updated, time-synchronised 
 
 The following will be added to this document as each phase is completed:
 
-- MySQL database backend (Phase 02)
 - Zabbix Server 7.0 LTS (Phase 03)
 - Apache/PHP frontend over HTTPS, restricted to `mgmt` (Phase 04)
 - SNMP monitoring of pfSense, with a dedicated pfSense firewall rule (Phase 05)

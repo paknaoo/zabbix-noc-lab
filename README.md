@@ -75,7 +75,7 @@ The following technologies are used throughout the project.
 |---|---|
 | Operating System | Ubuntu Server 24.04 LTS |
 | Monitoring Platform | Zabbix 7.0 LTS |
-| Database | MySQL |
+| Database | MySQL 8.0.46 |
 | Web Server | Apache with PHP |
 | Frontend Access | HTTPS with a self-signed certificate |
 | Monitoring Protocols | SNMP v2c, Zabbix agent2 |
@@ -93,6 +93,7 @@ The following components have been successfully deployed and validated so far.
 - SSH key-based authentication configured; password authentication disabled.
 - UFW enabled as a host-level firewall, default deny incoming, SSH only.
 - System time synchronised via `systemd-timesyncd`, correct local timezone set.
+- MySQL installed and hardened, with a dedicated `zabbix` database and a least-privilege `zabbix@localhost` user.
 
 ---
 
@@ -102,7 +103,7 @@ Implementation details are organised by project phase. Phases are listed in plan
 
 1. [Phase 00 — Planning](docs/phase-00-planning.md)
 2. [Phase 01 — VM Provisioning and System Baseline](docs/phase-01-vm-provisioning.md)
-3. Phase 02 — MySQL Installation and Configuration
+3. [Phase 02 — MySQL Installation and Configuration](docs/phase-02-mysql.md)
 4. Phase 03 — Zabbix Server Installation
 5. Phase 04 — Frontend Configuration (Apache, PHP, HTTPS)
 6. Phase 05 — SNMP Monitoring and pfSense Firewall Rules
@@ -129,13 +130,20 @@ Validation is grouped by phase and updated as each phase is completed.
 - `systemd-timesyncd` reports `System clock synchronized: yes` and `NTP service: active`.
 - System timezone confirmed set to `Europe/London`.
 
+### Phase 02 — MySQL Installation and Configuration
+
+- MySQL 8.0.46 installed; `systemctl status mysql` confirms `active (running)` and `enabled`.
+- `mysql_secure_installation` completed: anonymous users removed, remote root login disabled, test database removed.
+- `zabbix` database confirmed present with `utf8mb4` / `utf8mb4_bin` character set and collation.
+- `zabbix@localhost` user confirmed via `SHOW GRANTS`: privileges limited to `GRANT ALL PRIVILEGES ON zabbix.*`, host scope restricted to `localhost` (not `%`).
+
 Further phases will be added here as they are completed.
 
 ---
 
 ## Project Status
 
-This project is in progress. Phases 00 and 01 are complete; Phases 02–06 are planned and not yet implemented.
+This project is in progress. Phases 00–02 are complete; Phases 03–06 are planned and not yet implemented.
 
 GitOps, alerting configuration and broader observability tooling are intentionally out of scope for this repository's initial build.
 

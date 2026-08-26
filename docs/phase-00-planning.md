@@ -85,3 +85,15 @@ UFW provides a second layer of filtering on `zabbix-server`, in addition to the 
 - Default policy: deny incoming, allow outgoing.
 - The only inbound port currently open is `22/tcp` (SSH).
 - Ports are opened incrementally, only once the relevant component (for example, Apache in Phase 04) actually requires inbound traffic — not pre-emptively.
+
+---
+
+## Internet Egress Path: Direct NAT vs WireGuard
+
+> This decision was revisited and confirmed during Phase 02, after the VM was already provisioned in Phase 01. It is documented here, alongside the other Phase 00 decisions, as it concerns the same architectural question: how `zabbix-server` reaches the internet.
+
+**Question considered:** should `zabbix-server` route outbound traffic through the WireGuard full-tunnel VPN, in the same way as `mgmt`, rather than directly through NAT on pfSense?
+
+**Finding:** on review of the `k8s-cilium-lab` architecture, the WireGuard full-tunnel is specifically tied to the **management workstation** role (`mgmt`), not to the OUTSIDE network as a whole. It exists so that remote administration of the lab can be performed securely from `mgmt`, not as a blanket egress policy for every host in `192.168.50.0/24`.
+
+**Decision:** `zabbix-server` intentionally remains on direct NAT through pfSense, using the existing `HOST_ZABBIX → Any` rule. This preserves a clear separation of roles: `mgmt` handles remote administration over VPN, while `zabbix-server` is a monitoring service with direct, restricted outbound access. No configuration changes were required — this confirmed that the Phase 01 implementation was already correct.
