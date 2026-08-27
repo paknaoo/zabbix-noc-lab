@@ -97,6 +97,8 @@ The following components have been successfully deployed and validated so far.
 - Zabbix Server 7.0 LTS installed, database schema imported, and connected to MySQL.
 - Apache/PHP frontend served over HTTPS with a self-signed certificate, access restricted to `mgmt` via UFW.
 - Default Zabbix Admin password changed from its installation default.
+- SNMP v2c monitoring of pfSense configured and validated, with access restricted exclusively to `zabbix-server`.
+- pfSense added as a Zabbix host (`Network Devices` group), actively reporting 12 monitored items.
 
 ---
 
@@ -108,7 +110,7 @@ Implementation details are organised by project phase. Phases are listed in plan
 2. [Phase 01 — VM Provisioning and System Baseline](docs/phase-01-vm-provisioning.md)
 3. [Phase 02 — MySQL Installation and Configuration](docs/phase-02-mysql.md)
 4. [Phase 03 — Zabbix Server, Apache and PHP Installation](docs/phase-03-zabbix-server-apache-php.md)
-5. Phase 04 — SNMP Monitoring and pfSense Firewall Rules
+5. [Phase 04 — pfSense SNMP Monitoring](docs/phase-04-pfsense-snmp.md)
 6. Phase 05 — Zabbix Agent2 Deployment and Firewall Rules
 
 > **Note:** the original plan treated the frontend configuration as a separate phase from the Zabbix Server installation. In practice both were completed together (see Phase 03), so later phases have been renumbered accordingly to match the actual build order.
@@ -121,6 +123,7 @@ Validated troubleshooting cases are documented under:
 
 - [SSH Password Authentication Overridden by cloud-init](docs/troubleshooting/ssh-password-auth-cloud-init-override.md)
 - [MySQL Binary Logging Blocks Zabbix Schema Import](docs/troubleshooting/mysql-binlog-schema-import-failure.md)
+- [pfSense Broad Rule Leaking Access to Self-Targeted Traffic](docs/troubleshooting/pfsense-broad-rule-self-traffic-leak.md)
 
 ---
 
@@ -152,13 +155,20 @@ Validation is grouped by phase and updated as each phase is completed.
 - Default Zabbix Admin password changed from its installation default.
 - Negative test (frontend access from a non-`mgmt` OUTSIDE host) not performed — no third host currently exists on that network segment; noted as a scope limitation rather than a configuration gap.
 
+### Phase 04 — pfSense SNMP Monitoring
+
+- `snmpwalk -v2c -c zbx-noc-r0 192.168.50.254 system` from `zabbix-server` returns full pfSense system data, confirming SNMP working end-to-end.
+- Positive/negative test pair confirms least-privilege access: `zabbix-server` can query pfSense over SNMP; `mgmt` cannot (`Timeout: No Response`).
+- A firewall rule leak was found via routine negative testing and fixed with an explicit Block rule — see [pfSense Broad Rule Leaking Access to Self-Targeted Traffic](docs/troubleshooting/pfsense-broad-rule-self-traffic-leak.md).
+- Host `pfsense` confirmed in Zabbix's Latest data view with 12 active items reporting, tagged by component (health/network/system).
+
 Further phases will be added here as they are completed.
 
 ---
 
 ## Project Status
 
-This project is in progress. Phases 00–03 are complete; Phases 04–05 are planned and not yet implemented.
+This project is in progress. Phases 00–04 are complete; Phase 05 is planned and not yet implemented.
 
 GitOps, alerting configuration and broader observability tooling are intentionally out of scope for this repository's initial build.
 

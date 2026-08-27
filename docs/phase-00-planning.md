@@ -105,3 +105,9 @@ UFW provides a second layer of filtering on `zabbix-server`, in addition to the 
 During Phase 02, enabling `log_bin_trust_function_creators` on MySQL was considered as an optional "for good measure" step and was not applied at the time, since it did not appear strictly necessary for the database and user creation steps in that phase. Phase 03's Zabbix schema import subsequently failed because of exactly this setting — see [Troubleshooting: MySQL Binary Logging Blocks Zabbix Schema Import](troubleshooting/mysql-binlog-schema-import-failure.md) for the full incident.
 
 In hindsight, this setting is effectively required for any MySQL installation intended to host the Zabbix schema on Ubuntu 24.04, where binary logging is enabled by default. It is noted here, against the original Phase 02 planning, as a lesson for future phases of this lab and for the planning phase of subsequent portfolio projects: database prerequisites for a specific application's schema are worth checking against that application's documentation during planning, not discovered during the corresponding install phase.
+
+---
+
+## Retrospective Note: SNMP Trap Deliberately Not Used (added after Phase 04)
+
+When enabling SNMP on pfSense in Phase 04, the SNMP Trap feature was deliberately left disabled. This project uses a polling model throughout — Zabbix queries monitored devices on a schedule, rather than devices pushing events to a listener. Traps are a push-based mechanism and would require a different architecture (a trap receiver, and rules for what to do with unsolicited events). This is noted here as a considered exclusion, not an oversight: traps may be revisited if and when alerting is introduced as a separate, later phase, since alerting is precisely the kind of use case where a push-based mechanism becomes more relevant.
