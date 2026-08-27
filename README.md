@@ -74,9 +74,9 @@ The following technologies are used throughout the project.
 | Category | Technology |
 |---|---|
 | Operating System | Ubuntu Server 24.04 LTS |
-| Monitoring Platform | Zabbix 7.0 LTS |
+| Monitoring Platform | Zabbix 7.0.30 LTS |
 | Database | MySQL 8.0.46 |
-| Web Server | Apache with PHP |
+| Web Server | Apache 2.4.58 with PHP 8.3.6 (mod_php) |
 | Frontend Access | HTTPS with a self-signed certificate |
 | Monitoring Protocols | SNMP v2c, Zabbix agent2 |
 | Firewall | pfSense CE (perimeter), UFW (host-level) |
@@ -94,6 +94,9 @@ The following components have been successfully deployed and validated so far.
 - UFW enabled as a host-level firewall, default deny incoming, SSH only.
 - System time synchronised via `systemd-timesyncd`, correct local timezone set.
 - MySQL installed and hardened, with a dedicated `zabbix` database and a least-privilege `zabbix@localhost` user.
+- Zabbix Server 7.0 LTS installed, database schema imported, and connected to MySQL.
+- Apache/PHP frontend served over HTTPS with a self-signed certificate, access restricted to `mgmt` via UFW.
+- Default Zabbix Admin password changed from its installation default.
 
 ---
 
@@ -104,10 +107,11 @@ Implementation details are organised by project phase. Phases are listed in plan
 1. [Phase 00 — Planning](docs/phase-00-planning.md)
 2. [Phase 01 — VM Provisioning and System Baseline](docs/phase-01-vm-provisioning.md)
 3. [Phase 02 — MySQL Installation and Configuration](docs/phase-02-mysql.md)
-4. Phase 03 — Zabbix Server Installation
-5. Phase 04 — Frontend Configuration (Apache, PHP, HTTPS)
-6. Phase 05 — SNMP Monitoring and pfSense Firewall Rules
-7. Phase 06 — Zabbix Agent2 Deployment and Firewall Rules
+4. [Phase 03 — Zabbix Server, Apache and PHP Installation](docs/phase-03-zabbix-server-apache-php.md)
+5. Phase 04 — SNMP Monitoring and pfSense Firewall Rules
+6. Phase 05 — Zabbix Agent2 Deployment and Firewall Rules
+
+> **Note:** the original plan treated the frontend configuration as a separate phase from the Zabbix Server installation. In practice both were completed together (see Phase 03), so later phases have been renumbered accordingly to match the actual build order.
 
 The detailed current-state design is documented in:
 
@@ -116,6 +120,7 @@ The detailed current-state design is documented in:
 Validated troubleshooting cases are documented under:
 
 - [SSH Password Authentication Overridden by cloud-init](docs/troubleshooting/ssh-password-auth-cloud-init-override.md)
+- [MySQL Binary Logging Blocks Zabbix Schema Import](docs/troubleshooting/mysql-binlog-schema-import-failure.md)
 
 ---
 
@@ -137,13 +142,23 @@ Validation is grouped by phase and updated as each phase is completed.
 - `zabbix` database confirmed present with `utf8mb4` / `utf8mb4_bin` character set and collation.
 - `zabbix@localhost` user confirmed via `SHOW GRANTS`: privileges limited to `GRANT ALL PRIVILEGES ON zabbix.*`, host scope restricted to `localhost` (not `%`).
 
+### Phase 03 — Zabbix Server, Apache and PHP Installation
+
+- `zabbix-server` (7.0.30), `zabbix-agent2` (7.0.30) and `apache2` (2.4.58) all confirmed `active (running)` and `enabled` via `systemctl status`.
+- `zabbix-agent2` logs confirm successful configuration validation and clean startup.
+- `sudo ufw status verbose` confirms `443/tcp ALLOW IN 192.168.50.10` only — not `Anywhere` — alongside the existing `22/tcp` rule from Phase 01.
+- `curl -Ik https://192.168.50.20/` returns `HTTP/1.1 200 OK` with Zabbix's standard security headers and an `HttpOnly`/`secure` session cookie present.
+- `php -v` confirms PHP 8.3.6; `date.timezone = Europe/London` confirmed present in `/etc/php/8.3/apache2/php.ini`.
+- Default Zabbix Admin password changed from its installation default.
+- Negative test (frontend access from a non-`mgmt` OUTSIDE host) not performed — no third host currently exists on that network segment; noted as a scope limitation rather than a configuration gap.
+
 Further phases will be added here as they are completed.
 
 ---
 
 ## Project Status
 
-This project is in progress. Phases 00–02 are complete; Phases 03–06 are planned and not yet implemented.
+This project is in progress. Phases 00–03 are complete; Phases 04–05 are planned and not yet implemented.
 
 GitOps, alerting configuration and broader observability tooling are intentionally out of scope for this repository's initial build.
 

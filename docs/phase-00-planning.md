@@ -97,3 +97,11 @@ UFW provides a second layer of filtering on `zabbix-server`, in addition to the 
 **Finding:** on review of the `k8s-cilium-lab` architecture, the WireGuard full-tunnel is specifically tied to the **management workstation** role (`mgmt`), not to the OUTSIDE network as a whole. It exists so that remote administration of the lab can be performed securely from `mgmt`, not as a blanket egress policy for every host in `192.168.50.0/24`.
 
 **Decision:** `zabbix-server` intentionally remains on direct NAT through pfSense, using the existing `HOST_ZABBIX → Any` rule. This preserves a clear separation of roles: `mgmt` handles remote administration over VPN, while `zabbix-server` is a monitoring service with direct, restricted outbound access. No configuration changes were required — this confirmed that the Phase 01 implementation was already correct.
+
+---
+
+## Retrospective Note: MySQL Binary Logging Setting (added after Phase 03)
+
+During Phase 02, enabling `log_bin_trust_function_creators` on MySQL was considered as an optional "for good measure" step and was not applied at the time, since it did not appear strictly necessary for the database and user creation steps in that phase. Phase 03's Zabbix schema import subsequently failed because of exactly this setting — see [Troubleshooting: MySQL Binary Logging Blocks Zabbix Schema Import](troubleshooting/mysql-binlog-schema-import-failure.md) for the full incident.
+
+In hindsight, this setting is effectively required for any MySQL installation intended to host the Zabbix schema on Ubuntu 24.04, where binary logging is enabled by default. It is noted here, against the original Phase 02 planning, as a lesson for future phases of this lab and for the planning phase of subsequent portfolio projects: database prerequisites for a specific application's schema are worth checking against that application's documentation during planning, not discovered during the corresponding install phase.
