@@ -1,7 +1,5 @@
 # Phase 04 — pfSense SNMP Monitoring
 
-> **Note on phase numbering:** this phase was tracked as "Phase 05" during the build session, following the original Phase 00 plan. Because Phases 03 and 04 (Zabbix Server installation and frontend configuration) were merged into a single build phase — see [Phase 03](phase-03-zabbix-server-apache-php.md) — this repository numbers the SNMP work as **Phase 04**, to keep the documentation sequential. No implementation content is affected by the renumbering.
-
 This phase covers enabling SNMP monitoring of pfSense, installing the SNMP client and MIBs on `zabbix-server`, adding pfSense as a monitored host in Zabbix, and — critically — discovering and fixing an unintended firewall rule interaction found while running the standard negative-test methodology used throughout this project.
 
 ---

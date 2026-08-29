@@ -1,7 +1,5 @@
 # Phase 03 — Zabbix Server, Apache and PHP Installation
 
-> **Note on phase numbering:** the original plan (see [Phase 00 — Planning](phase-00-planning.md)) treated the Zabbix Server installation and the frontend configuration as two separate phases. In practice, both were completed together in a single build session, since the frontend installation wizard depends directly on the Zabbix Server and database being already in place. This document reflects the actual build order; phase numbers from Phase 04 onward have been adjusted accordingly (see the [README](../README.md#documentation)).
-
 This phase covers installing Zabbix Server 7.0 LTS, importing the database schema, configuring the Apache/PHP frontend over HTTPS, and restricting frontend access to `mgmt`.
 
 ---
