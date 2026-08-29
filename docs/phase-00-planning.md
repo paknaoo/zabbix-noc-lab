@@ -67,12 +67,12 @@ Zabbix host naming follows the existing hostnames 1:1, with no additional prefix
 
 | Source | Destination | Purpose | Phase |
 |---|---|---|---|
-| `HOST_ZABBIX` | `192.168.50.254:161/UDP` | SNMP to pfSense | 05 |
-| `HOST_ZABBIX` | `10.10.10.0/24:10050/TCP` | agent2 to Kubernetes nodes | 06 |
+| `HOST_ZABBIX` | `192.168.50.254:161/UDP` | SNMP to pfSense | 04 |
+| `HOST_ZABBIX` | `10.10.10.0/24:10050/TCP` | agent2 to Kubernetes nodes | 05 |
 
 **SNMP access on pfSense** will be restricted exclusively to `192.168.50.20/32`, rather than the whole OUTSIDE network — a deliberate least-privilege decision, consistent with the firewall philosophy used throughout `k8s-cilium-lab`.
 
-**Zabbix frontend access** (Apache/PHP, Phase 04) will be restricted to `mgmt` (`192.168.50.10`) only, not the whole OUTSIDE network.
+**Zabbix frontend access** (Apache/PHP, Phase 03) will be restricted to `mgmt` (`192.168.50.10`) only, not the whole OUTSIDE network.
 
 **Alerting** is out of scope for the initial build — only the dashboard and triggers will be configured. Alerting may be introduced as a later, separate phase.
 
@@ -84,7 +84,7 @@ UFW provides a second layer of filtering on `zabbix-server`, in addition to the 
 
 - Default policy: deny incoming, allow outgoing.
 - The only inbound port currently open is `22/tcp` (SSH).
-- Ports are opened incrementally, only once the relevant component (for example, Apache in Phase 04) actually requires inbound traffic — not pre-emptively.
+- Ports are opened incrementally, only once the relevant component (for example, Apache in Phase 03) actually requires inbound traffic — not pre-emptively.
 
 ---
 
@@ -105,6 +105,14 @@ UFW provides a second layer of filtering on `zabbix-server`, in addition to the 
 During Phase 02, enabling `log_bin_trust_function_creators` on MySQL was considered as an optional "for good measure" step and was not applied at the time, since it did not appear strictly necessary for the database and user creation steps in that phase. Phase 03's Zabbix schema import subsequently failed because of exactly this setting — see [Troubleshooting: MySQL Binary Logging Blocks Zabbix Schema Import](troubleshooting/mysql-binlog-schema-import-failure.md) for the full incident.
 
 In hindsight, this setting is effectively required for any MySQL installation intended to host the Zabbix schema on Ubuntu 24.04, where binary logging is enabled by default. It is noted here, against the original Phase 02 planning, as a lesson for future phases of this lab and for the planning phase of subsequent portfolio projects: database prerequisites for a specific application's schema are worth checking against that application's documentation during planning, not discovered during the corresponding install phase.
+
+---
+
+## Retrospective Note: Passive Agent2 Mode and Its Firewall Implications (added after Phase 05)
+
+Zabbix agent2 supports two connection models: **passive**, where Zabbix Server initiates a connection to the agent on port 10050, and **active**, where the agent initiates outbound connections to the server instead. This project uses passive mode throughout, on every agent2 host.
+
+This choice was implicit from the outset: the firewall rule for `HOST_ZABBIX → GRP_K8S_NODES : 10050` planned in this Phase 00 document already assumed Zabbix Server would be the one initiating the connection. It is worth stating this explicitly here, retrospectively, because the two modes imply different firewall designs — active mode would instead have required opening an inbound port *on* `zabbix-server` for agents to connect to, and outbound rules from each monitored host, rather than the single, centrally-controlled inbound rule to each monitored host used here. Passive mode keeps firewall control centralised at the monitoring server's side, which fits this project's broader pattern of restricting access from a single, well-defined source (`HOST_ZABBIX`) rather than from many individual hosts.
 
 ---
 

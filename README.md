@@ -99,6 +99,8 @@ The following components have been successfully deployed and validated so far.
 - Default Zabbix Admin password changed from its installation default.
 - SNMP v2c monitoring of pfSense configured and validated, with access restricted exclusively to `zabbix-server`.
 - pfSense added as a Zabbix host (`Network Devices` group), actively reporting 12 monitored items.
+- Zabbix agent2 deployed on all remaining hosts (`k8s-master`, `k8s-worker1`, `k8s-worker2`, `mgmt`) in passive mode; all now enabled and reporting in Zabbix.
+- **All six planned hosts are actively monitored**, closing the project's main functional goal.
 
 ---
 
@@ -111,9 +113,8 @@ Implementation details are organised by project phase. Phases are listed in plan
 3. [Phase 02 — MySQL Installation and Configuration](docs/phase-02-mysql.md)
 4. [Phase 03 — Zabbix Server, Apache and PHP Installation](docs/phase-03-zabbix-server-apache-php.md)
 5. [Phase 04 — pfSense SNMP Monitoring](docs/phase-04-pfsense-snmp.md)
-6. Phase 05 — Zabbix Agent2 Deployment and Firewall Rules
-
-> **Note:** the original plan treated the frontend configuration as a separate phase from the Zabbix Server installation. In practice both were completed together (see Phase 03), so later phases have been renumbered accordingly to match the actual build order.
+6. [Phase 05 — Zabbix Agent2 Deployment Across Monitored Hosts](docs/phase-05-agent2-nodes.md)
+7. Phase 06 — Trigger Tuning, Dashboards and Alerting *(extension beyond the original Phase 00 roadmap)*
 
 The detailed current-state design is documented in:
 
@@ -124,6 +125,8 @@ Validated troubleshooting cases are documented under:
 - [SSH Password Authentication Overridden by cloud-init](docs/troubleshooting/ssh-password-auth-cloud-init-override.md)
 - [MySQL Binary Logging Blocks Zabbix Schema Import](docs/troubleshooting/mysql-binlog-schema-import-failure.md)
 - [pfSense Broad Rule Leaking Access to Self-Targeted Traffic](docs/troubleshooting/pfsense-broad-rule-self-traffic-leak.md)
+- [UFW Risk Assessment on Kubernetes Nodes](docs/troubleshooting/ufw-kubernetes-node-risk-assessment.md)
+- [Missing ICMP Rule After Narrowing HOST_ZABBIX](docs/troubleshooting/missing-icmp-rule-after-firewall-narrowing.md)
 
 ---
 
@@ -162,15 +165,24 @@ Validation is grouped by phase and updated as each phase is completed.
 - A firewall rule leak was found via routine negative testing and fixed with an explicit Block rule — see [pfSense Broad Rule Leaking Access to Self-Targeted Traffic](docs/troubleshooting/pfsense-broad-rule-self-traffic-leak.md).
 - Host `pfsense` confirmed in Zabbix's Latest data view with 12 active items reporting, tagged by component (health/network/system).
 
+### Phase 05 — Zabbix Agent2 Deployment Across Monitored Hosts
+
+- `zabbix_get -k agent.ping` from `zabbix-server` returns `1` for `k8s-master`, `k8s-worker1`, `k8s-worker2` and `mgmt`.
+- An out-of-scope `zabbix_get` run from `k8s-master` itself correctly returned an access-permission error, confirming passive-mode source-IP restriction works as intended.
+- Zabbix Hosts view confirms `Displaying 6 of 6 found`, all hosts `Enabled`.
+- `sudo ufw status verbose` on `mgmt` confirms only WireGuard (`56666/udp`) and agent2 polling from `192.168.50.20` are permitted inbound.
+- `ping -c 4 192.168.50.254` from `zabbix-server` confirms 0% packet loss after the ICMP rule fix, and the corresponding Zabbix trigger cleared automatically.
+- UFW confirmed `inactive` on `k8s-master` following the Phase 05 risk assessment — a deliberate end state, not an oversight.
+
 Further phases will be added here as they are completed.
 
 ---
 
 ## Project Status
 
-This project is in progress. Phases 00–04 are complete; Phase 05 is planned and not yet implemented.
+This project is in progress. Phases 00–05 are complete, closing the core functional goal: every planned host is actively monitored.
 
-GitOps, alerting configuration and broader observability tooling are intentionally out of scope for this repository's initial build.
+Phase 06 (trigger tuning, dashboards and alerting configuration) is planned as an extension beyond the original Phase 00 roadmap, and is not yet implemented.
 
 ---
 
