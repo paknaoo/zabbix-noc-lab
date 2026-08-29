@@ -2,7 +2,7 @@
 
 This document describes the current-state design of `zabbix-noc-lab`. It is updated after each phase is completed and validated; it reflects what has actually been built, not the full end-state plan (see the [README](../README.md#documentation) for the phase roadmap).
 
-**Current state: Phase 05 complete.** Every planned host is actively monitored: `zabbix-server` (Zabbix Server, MySQL, Apache/PHP frontend), `pfsense` (SNMP), and `k8s-master`, `k8s-worker1`, `k8s-worker2` and `mgmt` (Zabbix agent2). This closes the project's main functional monitoring goal. Remaining work (Phase 06 onward) covers triggers, dashboards and alerting refinement, not new monitored infrastructure.
+**Current state: Phase 06 complete.** Every planned host is actively monitored, and a functional NOC-style dashboard (`NOC Overview`) provides a single-pane-of-glass view of problems, host availability and key performance graphs. Alerting (notifications) remains deliberately out of scope, per the original Phase 00 plan.
 
 ---
 
@@ -107,14 +107,31 @@ Rules 1–5 and 7 predate this repository and belong to `k8s-cilium-lab`'s archi
 
 | Host (in Zabbix) | Monitoring method | Host group | Template | Status |
 |---|---|---|---|---|
-| `pfsense` | SNMP v2c, community `zbx-noc-r0` | Network Devices | Generic by SNMP | Enabled, 12 items active |
+| `pfsense` | SNMP v2c, community `zbx-noc-r0` | Network Devices | pfSense by SNMP | Enabled, 1 trigger deliberately disabled (DHCP — see [troubleshooting](troubleshooting/pfsense-template-dhcp-false-alarm.md)) |
 | `k8s-master` | Zabbix agent2 (passive), `10.10.10.20:10050` | Kubernetes Nodes | Linux by Zabbix agent | Enabled |
 | `k8s-worker1` | Zabbix agent2 (passive), `10.10.10.21:10050` | Kubernetes Nodes | Linux by Zabbix agent | Enabled |
 | `k8s-worker2` | Zabbix agent2 (passive), `10.10.10.22:10050` | Kubernetes Nodes | Linux by Zabbix agent | Enabled |
 | `mgmt` | Zabbix agent2 (passive), `192.168.50.10:10050` | Management | Linux by Zabbix agent | Enabled |
 | Zabbix server *(default, auto-created)* | Zabbix agent2 (local), `127.0.0.1:10050` | Zabbix servers | *(default installer template)* | Enabled |
 
-All six planned hosts are enabled and reporting — confirmed via the Zabbix Hosts view (`Displaying 6 of 6 found`). Two mild, informational Warning-level triggers remain open (`k8s-master`, `Zabbix server`), deliberately deferred to Phase 06.
+All six planned hosts are enabled and reporting — confirmed via the Zabbix Hosts view (`Displaying 6 of 6 found`). Both previously-open Warning-level triggers (`k8s-master`, `Zabbix server` — OS description changed) have been acknowledged, with a comment explaining the expected cause, rather than disabled — this preserves the trigger's ability to flag a genuinely *unexpected* future OS change as a possible security signal.
+
+---
+
+## Monitoring Dashboard
+
+A single dashboard, **`NOC Overview`**, provides a top-to-bottom, general-to-specific view of the environment:
+
+1. **Problems** — recent problems across all hosts, sorted by severity
+2. **Host availability** — aggregate availability by interface type (agent, SNMP)
+3. **k8s Nodes — CPU Utilization** and **Memory Utilization** — side by side, all three nodes on each chart
+4. **pfSense — Network Traffic (OUTSIDE)** and **Firewall State Table Utilization** — side by side
+
+![NOC Overview dashboard](assets/phase-06/noc-overview-dashboard.png)
+
+The pfSense throughput and firewall state table metrics became available only after replacing the `pfsense` host's template with **"pfSense by SNMP"** (see [Phase 06](phase-06-dashboards-triggers.md) for the full reasoning) — the previously-assigned "Generic by SNMP" template had no Low-Level Discovery rule for network interfaces. This template swap also surfaced one trigger not applicable to this architecture (DHCP server availability), which was deliberately disabled since this lab uses static IP addressing throughout — see [Troubleshooting: False DHCP Alarm After pfSense Template Swap](troubleshooting/pfsense-template-dhcp-false-alarm.md).
+
+No custom triggers were added beyond those provided by the official assigned templates ("pfSense by SNMP", "Linux by Zabbix agent") — a deliberate decision, since the existing set already covers availability, performance, configuration drift and host-restart scenarios for every monitored host.
 
 ---
 
@@ -122,7 +139,7 @@ All six planned hosts are enabled and reporting — confirmed via the Zabbix Hos
 
 The following will be added to this document as each phase is completed:
 
-- Trigger tuning, dashboards and alerting configuration (Phase 06)
+- Hardening (optional, under consideration): TLS between agent2 and the server (PSK or certificates), further restriction of frontend access
 
 ---
 

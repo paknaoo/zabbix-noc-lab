@@ -108,6 +108,12 @@ In hindsight, this setting is effectively required for any MySQL installation in
 
 ---
 
+## Retrospective Note: SNMP Trap Deliberately Not Used (added after Phase 04)
+
+When enabling SNMP on pfSense in Phase 04, the SNMP Trap feature was deliberately left disabled. This project uses a polling model throughout — Zabbix queries monitored devices on a schedule, rather than devices pushing events to a listener. Traps are a push-based mechanism and would require a different architecture (a trap receiver, and rules for what to do with unsolicited events). This is noted here as a considered exclusion, not an oversight: traps may be revisited if and when alerting is introduced as a separate, later phase, since alerting is precisely the kind of use case where a push-based mechanism becomes more relevant.
+
+---
+
 ## Retrospective Note: Passive Agent2 Mode and Its Firewall Implications (added after Phase 05)
 
 Zabbix agent2 supports two connection models: **passive**, where Zabbix Server initiates a connection to the agent on port 10050, and **active**, where the agent initiates outbound connections to the server instead. This project uses passive mode throughout, on every agent2 host.
@@ -116,6 +122,6 @@ This choice was implicit from the outset: the firewall rule for `HOST_ZABBIX →
 
 ---
 
-## Retrospective Note: SNMP Trap Deliberately Not Used (added after Phase 04)
+## Retrospective Confirmation: Alerting Deliberately Out of Scope (added after Phase 06)
 
-When enabling SNMP on pfSense in Phase 04, the SNMP Trap feature was deliberately left disabled. This project uses a polling model throughout — Zabbix queries monitored devices on a schedule, rather than devices pushing events to a listener. Traps are a push-based mechanism and would require a different architecture (a trap receiver, and rules for what to do with unsolicited events). This is noted here as a considered exclusion, not an oversight: traps may be revisited if and when alerting is introduced as a separate, later phase, since alerting is precisely the kind of use case where a push-based mechanism becomes more relevant.
+The original plan above states that alerting is out of scope for the initial build — only the dashboard and triggers were planned. Phase 06 confirmed this as implemented: a full NOC dashboard and a tuned trigger set were delivered, while email/webhook notifications were deliberately not configured. This is recorded here as a confirmation that the build followed the original plan, not as a new decision.

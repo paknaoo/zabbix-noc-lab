@@ -8,6 +8,8 @@ The environment is being built incrementally, with each completed phase document
 
 Unlike the author's previous lab, this repository documents planning rationale as a dedicated phase (`docs/phase-00-planning.md`), capturing *why* each architectural decision was made, not only *what* was built.
 
+![NOC Overview dashboard](docs/assets/phase-06/noc-overview-dashboard.png)
+
 ---
 
 ## Related Infrastructure
@@ -101,6 +103,8 @@ The following components have been successfully deployed and validated so far.
 - pfSense added as a Zabbix host (`Network Devices` group), actively reporting 12 monitored items.
 - Zabbix agent2 deployed on all remaining hosts (`k8s-master`, `k8s-worker1`, `k8s-worker2`, `mgmt`) in passive mode; all now enabled and reporting in Zabbix.
 - **All six planned hosts are actively monitored**, closing the project's main functional goal.
+- A functional NOC-style dashboard (`NOC Overview`) with problems, host availability and key performance graphs.
+- Trigger set tuned to this architecture: one inapplicable trigger (DHCP) disabled, informational OS-change triggers acknowledged rather than suppressed.
 
 ---
 
@@ -114,7 +118,7 @@ Implementation details are organised by project phase. Phases are listed in plan
 4. [Phase 03 — Zabbix Server, Apache and PHP Installation](docs/phase-03-zabbix-server-apache-php.md)
 5. [Phase 04 — pfSense SNMP Monitoring](docs/phase-04-pfsense-snmp.md)
 6. [Phase 05 — Zabbix Agent2 Deployment Across Monitored Hosts](docs/phase-05-agent2-nodes.md)
-7. Phase 06 — Trigger Tuning, Dashboards and Alerting *(extension beyond the original Phase 00 roadmap)*
+7. [Phase 06 — Triggers and NOC Dashboard](docs/phase-06-dashboards-triggers.md)
 
 The detailed current-state design is documented in:
 
@@ -127,6 +131,7 @@ Validated troubleshooting cases are documented under:
 - [pfSense Broad Rule Leaking Access to Self-Targeted Traffic](docs/troubleshooting/pfsense-broad-rule-self-traffic-leak.md)
 - [UFW Risk Assessment on Kubernetes Nodes](docs/troubleshooting/ufw-kubernetes-node-risk-assessment.md)
 - [Missing ICMP Rule After Narrowing HOST_ZABBIX](docs/troubleshooting/missing-icmp-rule-after-firewall-narrowing.md)
+- [False DHCP Alarm After pfSense Template Swap](docs/troubleshooting/pfsense-template-dhcp-false-alarm.md)
 
 ---
 
@@ -174,15 +179,23 @@ Validation is grouped by phase and updated as each phase is completed.
 - `ping -c 4 192.168.50.254` from `zabbix-server` confirms 0% packet loss after the ICMP rule fix, and the corresponding Zabbix trigger cleared automatically.
 - UFW confirmed `inactive` on `k8s-master` following the Phase 05 risk assessment — a deliberate end state, not an oversight.
 
+### Phase 06 — Triggers and NOC Dashboard
+
+- `NOC Overview` dashboard confirmed live with 6 widgets: Problems, Host availability, and four performance graphs.
+- Host availability widget confirms 6/6 hosts `Available`, zero `Not available`/`Mixed`/`Unknown`.
+- `pfsense` host template confirmed swapped to "pfSense by SNMP"; new throughput and firewall state table items confirmed populated on the dashboard graphs.
+- False "DHCP server is not running" trigger confirmed disabled at the host level, with reasoning documented.
+- Both remaining Warning problems (OS description changed) confirmed acknowledged with an explanatory comment; zero unaddressed problems at phase close.
+
 Further phases will be added here as they are completed.
 
 ---
 
 ## Project Status
 
-This project is in progress. Phases 00–05 are complete, closing the core functional goal: every planned host is actively monitored.
+This project is in progress. Phases 00–06 are complete: every planned host is actively monitored, and a functional NOC dashboard with a tuned trigger set is in place.
 
-Phase 06 (trigger tuning, dashboards and alerting configuration) is planned as an extension beyond the original Phase 00 roadmap, and is not yet implemented.
+Alerting (email/webhook notifications) remains deliberately out of scope, per the original Phase 00 plan. An optional hardening phase (TLS between agent2 and the server, further frontend restrictions) is under consideration but not yet started.
 
 ---
 
