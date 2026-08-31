@@ -125,3 +125,11 @@ This choice was implicit from the outset: the firewall rule for `HOST_ZABBIX →
 ## Retrospective Confirmation: Alerting Deliberately Out of Scope (added after Phase 06)
 
 The original plan above states that alerting is out of scope for the initial build — only the dashboard and triggers were planned. Phase 06 confirmed this as implemented: a full NOC dashboard and a tuned trigger set were delivered, while email/webhook notifications were deliberately not configured. This is recorded here as a confirmation that the build followed the original plan, not as a new decision.
+
+---
+
+## Retrospective Note: PKI Chosen Over PSK for Agent2 Encryption (added after Phase 07)
+
+Zabbix supports two options for encrypting agent2 traffic: a pre-shared key (PSK), which is simpler to configure, or full certificate-based TLS (PKI), which requires running a CA and managing a certificate per host. PSK is Zabbix's own recommended default for this use case.
+
+PKI was chosen instead, deliberately, despite the additional setup effort across five hosts. The reasoning is portfolio-oriented as much as technical: running a small CA — generating its key and certificate, signing per-host CSRs, distributing certificates and keys securely, and cleaning up private keys afterwards — demonstrates a broader, more transferable set of skills than configuring a shared secret, and more closely resembles how certificate management is handled in real enterprise environments. For a lab of this size, PSK would have been the more proportionate engineering choice; PKI was chosen here specifically because the demonstration value outweighed the added complexity for a portfolio project.

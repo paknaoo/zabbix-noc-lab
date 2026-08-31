@@ -4,7 +4,7 @@
 
 This repository documents the design, deployment and validation of a Zabbix 7.0 LTS monitoring station, built without containers to demonstrate direct systems administration of the underlying services. The project focuses on Linux system administration, MySQL, SNMP monitoring and firewall segmentation, following the same structured, phase-by-phase implementation approach used in the author's previous lab.
 
-The environment is being built incrementally, with each completed phase documented and validated before the next is introduced. This repository documents only capabilities that have been implemented and validated in the lab.
+The environment was built incrementally, with each phase documented and validated before the next was introduced. This repository documents only capabilities that have been implemented and validated in the lab. **The project has now reached functional completion**, covering the full scope originally planned in [Phase 00](docs/phase-00-planning.md).
 
 Unlike the author's previous lab, this repository documents planning rationale as a dedicated phase (`docs/phase-00-planning.md`), capturing *why* each architectural decision was made, not only *what* was built.
 
@@ -47,12 +47,11 @@ flowchart TD
 
     MGMT -->|HTTPS, frontend access| ZBX
     ZBX -->|SNMP v2c| PFSENSE
-    ZBX -->|agent2, routed via pfSense| MASTER
-    ZBX -->|agent2, routed via pfSense| WORKER1
-    ZBX -->|agent2, routed via pfSense| WORKER2
+    ZBX -->|agent2 (TLS), routed via pfSense| MASTER
+    ZBX -->|agent2 (TLS), routed via pfSense| WORKER1
+    ZBX -->|agent2 (TLS), routed via pfSense| WORKER2
+    ZBX -->|agent2 (TLS), UFW-restricted| MGMT
 ```
-
-    Loading
 
 ---
 
@@ -65,6 +64,8 @@ The project is designed to build practical experience with monitoring and observ
 - Monitor an existing Kubernetes lab and its network perimeter without modifying that lab's repository or scope.
 - Design and validate firewall segmentation for monitoring traffic on pfSense, using least-privilege access rules.
 - Practise Linux-based administration, including systemd, UFW and SSH hardening.
+- Build a single-pane-of-glass NOC dashboard covering availability, performance and problem visibility.
+- Encrypt monitoring traffic end-to-end using a self-managed PKI, rather than relying on a shared secret.
 - Maintain concise, reproducible infrastructure documentation suitable for a technical portfolio.
 
 ---
@@ -80,8 +81,9 @@ The following technologies are used throughout the project.
 | Database | MySQL 8.0.46 |
 | Web Server | Apache 2.4.58 with PHP 8.3.6 (mod_php) |
 | Frontend Access | HTTPS with a self-signed certificate |
-| Monitoring Protocols | SNMP v2c, Zabbix agent2 |
+| Monitoring Protocols | SNMP v2c, Zabbix agent2 (TLS, self-managed PKI) |
 | Firewall | pfSense CE (perimeter), UFW (host-level) |
+| Frontend Hardening | HTTP→HTTPS redirect, HSTS and security headers |
 | Remote Administration | OpenSSH, key-based authentication only |
 | Source Control | Git and GitHub |
 
@@ -105,6 +107,8 @@ The following components have been successfully deployed and validated so far.
 - **All six planned hosts are actively monitored**, closing the project's main functional goal.
 - A functional NOC-style dashboard (`NOC Overview`) with problems, host availability and key performance graphs.
 - Trigger set tuned to this architecture: one inapplicable trigger (DHCP) disabled, informational OS-change triggers acknowledged rather than suppressed.
+- Frontend hardened: HTTP forces a redirect to HTTPS, five security headers active (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, X-XSS-Protection).
+- All Zabbix agent2 traffic encrypted with certificates from a lab-internal Certificate Authority; unencrypted connections actively rejected (confirmed by negative test).
 
 ---
 
@@ -119,6 +123,7 @@ Implementation details are organised by project phase. Phases are listed in plan
 5. [Phase 04 — pfSense SNMP Monitoring](docs/phase-04-pfsense-snmp.md)
 6. [Phase 05 — Zabbix Agent2 Deployment Across Monitored Hosts](docs/phase-05-agent2-nodes.md)
 7. [Phase 06 — Triggers and NOC Dashboard](docs/phase-06-dashboards-triggers.md)
+8. [Phase 07 — Security Hardening](docs/phase-07-hardening.md)
 
 The detailed current-state design is documented in:
 
@@ -132,6 +137,7 @@ Validated troubleshooting cases are documented under:
 - [UFW Risk Assessment on Kubernetes Nodes](docs/troubleshooting/ufw-kubernetes-node-risk-assessment.md)
 - [Missing ICMP Rule After Narrowing HOST_ZABBIX](docs/troubleshooting/missing-icmp-rule-after-firewall-narrowing.md)
 - [False DHCP Alarm After pfSense Template Swap](docs/troubleshooting/pfsense-template-dhcp-false-alarm.md)
+- [TLS Per-Host Encryption Setting Not Applied](docs/troubleshooting/tls-per-host-encryption-setting-not-applied.md)
 
 ---
 
@@ -187,15 +193,28 @@ Validation is grouped by phase and updated as each phase is completed.
 - False "DHCP server is not running" trigger confirmed disabled at the host level, with reasoning documented.
 - Both remaining Warning problems (OS description changed) confirmed acknowledged with an explanatory comment; zero unaddressed problems at phase close.
 
+### Phase 07 — Security Hardening
+
+- `curl -Ik http://192.168.50.20` confirms `301 Moved Permanently` with a `Location` header pointing to HTTPS.
+- `curl -Ik https://192.168.50.20 --insecure` confirms all five configured security headers present in the response.
+- Final PKI directory listing on `zabbix-server` confirms the CA, server certificate/key, and only the four agents' *public* certificates remain — no agent private keys.
+- `zabbix_get --tls-connect cert` (with correct CA/cert/key paths) returns `1` for all four agent2 hosts (`k8s-master`, `k8s-worker1`, `k8s-worker2`, `mgmt`).
+- Negative test: `zabbix_get` without TLS flags against `k8s-master` returns `Connection reset by peer`, confirming unencrypted connections are actively rejected, not merely one of two accepted options.
+
 Further phases will be added here as they are completed.
 
 ---
 
 ## Project Status
 
-This project is in progress. Phases 00–06 are complete: every planned host is actively monitored, and a functional NOC dashboard with a tuned trigger set is in place.
+This project is **functionally complete**. Phases 00–07 cover the full scope originally planned: every host is monitored, a NOC dashboard with a tuned trigger set is live, and the frontend and agent2 traffic are both hardened (HTTPS with security headers, and TLS with a self-managed PKI, respectively).
 
-Alerting (email/webhook notifications) remains deliberately out of scope, per the original Phase 00 plan. An optional hardening phase (TLS between agent2 and the server, further frontend restrictions) is under consideration but not yet started.
+Two pieces of work stand out as the strongest evidence of the methodology used throughout this project:
+
+- **[pfSense Broad Rule Leaking Access to Self-Targeted Traffic](docs/troubleshooting/pfsense-broad-rule-self-traffic-leak.md)** (Phase 04) — a firewall access leak found purely through routine negative testing, diagnosed via pfSense's rule-ordering behaviour, and fixed with a minimal, scope-respecting change.
+- **[Phase 07 — Security Hardening](docs/phase-07-hardening.md)** — a self-managed Certificate Authority issuing and managing certificates for all monitored hosts, chosen deliberately over the simpler PSK option to demonstrate broader certificate-management skills.
+
+Alerting (email/webhook notifications) remains deliberately out of scope, per the original Phase 00 plan.
 
 ---
 

@@ -2,7 +2,7 @@
 
 This document describes the current-state design of `zabbix-noc-lab`. It is updated after each phase is completed and validated; it reflects what has actually been built, not the full end-state plan (see the [README](../README.md#documentation) for the phase roadmap).
 
-**Current state: Phase 06 complete.** Every planned host is actively monitored, and a functional NOC-style dashboard (`NOC Overview`) provides a single-pane-of-glass view of problems, host availability and key performance graphs. Alerting (notifications) remains deliberately out of scope, per the original Phase 00 plan.
+**Current state: Phase 07 complete. The project is functionally complete**, covering the full scope originally planned in Phase 00. Every host is monitored, a NOC dashboard with a tuned trigger set is live, the frontend enforces HTTPS with security headers, and all agent2 traffic is encrypted with certificates from a lab-internal CA. Alerting (notifications) remains deliberately out of scope, per the original Phase 00 plan.
 
 ---
 
@@ -23,15 +23,16 @@ This document describes the current-state design of `zabbix-noc-lab`. It is upda
 flowchart TD
 
     subgraph OUTSIDE["OUTSIDE / Management Network — 192.168.50.0/24"]
-        MGMT["mgmt — 192.168.50.10<br/>UFW: WireGuard + agent2 from zabbix-server only<br/>Zabbix agent2 (passive)"]
+        MGMT["mgmt — 192.168.50.10<br/>UFW: WireGuard + agent2 from zabbix-server only<br/>Zabbix agent2 (passive, TLS cert)"]
         subgraph ZBXHOST["zabbix-server — 192.168.50.20<br/>Ubuntu 24.04 LTS, SSH key-auth only, UFW active"]
             ZBXSRV[Zabbix Server 7.0<br/>port 10051]
             AGENT[Zabbix agent2<br/>self-monitoring, host: Zabbix server]
-            APACHE["Apache + mod_php<br/>HTTPS :443, self-signed cert"]
+            APACHE["Apache + mod_php<br/>HTTP :80 → 301 redirect<br/>HTTPS :443, self-signed cert + security headers"]
             MYSQL[("MySQL 8.0<br/>zabbix database<br/>zabbix@localhost user")]
+            CA[("zabbix-noc-lab-CA<br/>/etc/zabbix/pki/")]
             APACHE -->|frontend queries| MYSQL
             ZBXSRV -->|DBconnect| MYSQL
-            ZBXSRV -.->|agent.ping| AGENT
+            ZBXSRV -.->|agent.ping, TLS cert| AGENT
         end
         PFSENSE["pfSense — 192.168.50.254<br/>SNMP daemon, community: zbx-noc-r0"]
         ZBXSRV -->|SNMP v2c :161 + ICMP<br/>allowed| PFSENSE
@@ -39,17 +40,21 @@ flowchart TD
     end
 
     subgraph K8S["Kubernetes LAN — 10.10.10.0/24 (k8s-cilium-lab)<br/>UFW deliberately not used — see troubleshooting"]
-        K8SMASTER["k8s-master — 10.10.10.20<br/>Zabbix agent2 (passive), :10050"]
-        K8SW1["k8s-worker1 — 10.10.10.21<br/>Zabbix agent2 (passive), :10050"]
-        K8SW2["k8s-worker2 — 10.10.10.22<br/>Zabbix agent2 (passive), :10050"]
+        K8SMASTER["k8s-master — 10.10.10.20<br/>Zabbix agent2 (passive, TLS cert), :10050"]
+        K8SW1["k8s-worker1 — 10.10.10.21<br/>Zabbix agent2 (passive, TLS cert), :10050"]
+        K8SW2["k8s-worker2 — 10.10.10.22<br/>Zabbix agent2 (passive, TLS cert), :10050"]
     end
 
     MGMT -->|HTTPS :443, UFW-restricted| APACHE
     MGMT -->|SSH| ZBXHOST
-    ZBXSRV -->|agent2 poll :10050<br/>pfSense-restricted only| K8SMASTER
-    ZBXSRV -->|agent2 poll :10050<br/>pfSense-restricted only| K8SW1
-    ZBXSRV -->|agent2 poll :10050<br/>pfSense-restricted only| K8SW2
-    ZBXSRV -->|agent2 poll :10050<br/>UFW-restricted| MGMT
+    CA -.->|issues certs| K8SMASTER
+    CA -.->|issues certs| K8SW1
+    CA -.->|issues certs| K8SW2
+    CA -.->|issues certs| MGMT
+    ZBXSRV -->|agent2 poll :10050, TLS cert<br/>pfSense-restricted only| K8SMASTER
+    ZBXSRV -->|agent2 poll :10050, TLS cert<br/>pfSense-restricted only| K8SW1
+    ZBXSRV -->|agent2 poll :10050, TLS cert<br/>pfSense-restricted only| K8SW2
+    ZBXSRV -->|agent2 poll :10050, TLS cert<br/>UFW-restricted| MGMT
 ```
 
 Every planned host is now monitored. `zabbix-server` polls the three Kubernetes nodes and `mgmt` over Zabbix agent2 (passive mode — Zabbix Server initiates each connection), and polls pfSense over SNMP v2c. `zabbix-agent2` on `zabbix-server` itself continues to self-report under the default "Zabbix server" host created by the installation wizard.
@@ -135,11 +140,37 @@ No custom triggers were added beyond those provided by the official assigned tem
 
 ---
 
-## Planned Components
+## Security Hardening
 
-The following will be added to this document as each phase is completed:
+### Frontend
 
-- Hardening (optional, under consideration): TLS between agent2 and the server (PSK or certificates), further restriction of frontend access
+- **HTTP → HTTPS redirect:** the port-80 VirtualHost issues a `301 Moved Permanently` to HTTPS for all requests, using `%{HTTP_HOST}` rather than a hardcoded hostname so the redirect works whether the frontend is reached by hostname or IP.
+- **Security headers:** `Strict-Transport-Security`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` and `X-XSS-Protection` are set at the Apache level, in addition to headers the Zabbix frontend already sets independently at the application layer — a small, deliberate example of layered defence rather than relying on a single source of protection.
+
+### Agent2 Encryption (Self-Managed PKI)
+
+All Zabbix agent2 traffic between `zabbix-server` and its four monitored agent hosts (`k8s-master`, `k8s-worker1`, `k8s-worker2`, `mgmt`) is encrypted and certificate-authenticated, using a lab-internal Certificate Authority rather than Zabbix's simpler PSK option — chosen deliberately to demonstrate certificate lifecycle management (CA creation, CSR signing, distribution, cleanup) over the lighter-weight alternative.
+
+```mermaid
+flowchart LR
+    CA[("zabbix-noc-lab-CA<br/>10-year validity<br/>private key: zabbix-server only")]
+    SRV["zabbix_server.crt<br/>(Zabbix Server)"]
+    A1["k8s-master.crt"]
+    A2["k8s-worker1.crt"]
+    A3["k8s-worker2.crt"]
+    A4["mgmt.crt"]
+    CA -->|signs| SRV
+    CA -->|signs| A1
+    CA -->|signs| A2
+    CA -->|signs| A3
+    CA -->|signs| A4
+```
+
+Each host's `TLSConnect`/`TLSAccept` is set to `cert`, and the Zabbix UI's per-host Encryption setting ("Connections to host") is set to Certificate for each monitored host — both layers are required together; see [Troubleshooting: TLS Per-Host Encryption Setting Not Applied](troubleshooting/tls-per-host-encryption-setting-not-applied.md) for what happens when only one is configured.
+
+**PKI hygiene:** once all four agents were confirmed working, their private keys were deleted from `zabbix-server`, leaving only the CA's own key/certificate, the server's own key/certificate, and the agents' *public* certificates (harmless to retain, useful for reference). This reflects standard CA practice: a CA signs certificates for the entities it serves, but does not retain their private keys.
+
+A negative test (an unencrypted `zabbix_get`, with no TLS flags) confirms agents actively reject plaintext connections rather than merely tolerating both encrypted and unencrypted traffic — consistent with this repository's negative-testing standard applied throughout.
 
 ---
 
