@@ -47,10 +47,10 @@ flowchart TD
 
     MGMT -->|HTTPS, frontend access| ZBX
     ZBX -->|SNMP v2c| PFSENSE
-    ZBX -->|agent2 (TLS), routed via pfSense| MASTER
-    ZBX -->|agent2 (TLS), routed via pfSense| WORKER1
-    ZBX -->|agent2 (TLS), routed via pfSense| WORKER2
-    ZBX -->|agent2 (TLS), UFW-restricted| MGMT
+    ZBX -->|agent2 TLS, routed via pfSense| MASTER
+    ZBX -->|agent2 TLS, routed via pfSense| WORKER1
+    ZBX -->|agent2 TLS, routed via pfSense| WORKER2
+    ZBX -->|agent2 TLS, UFW-restricted| MGMT
 ```
 
 ---
